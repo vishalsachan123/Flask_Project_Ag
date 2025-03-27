@@ -1,21 +1,23 @@
-import os
-import asyncio
+import eventlet
+eventlet.monkey_patch()  # Must be first import
+
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 from agents import main_process
 import logging
-from logging.handlers import RotatingFileHandler
+import os
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
-# Initialize logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Production SocketIO configuration
+# SocketIO configuration
 socketio = SocketIO(
     app,
-    cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '').split(','),
+    cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*'),
     async_mode='eventlet',
     logger=os.getenv('DEBUG', 'false').lower() == 'true',
     engineio_logger=os.getenv('DEBUG', 'false').lower() == 'true',
@@ -23,10 +25,6 @@ socketio = SocketIO(
     ping_interval=25,
     max_http_buffer_size=1e8
 )
-
-# Global event loop setup
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
 
 @app.route('/health')
 def health_check():
@@ -44,8 +42,10 @@ def handle_start_chat(data):
             emit("error", {"message": "Empty query"})
             return
             
-        logger.info(f"Processing query: {query[:50]}...")  # Log truncated query
-        loop.run_until_complete(main_process(query, socketio))
+        logger.info(f"Processing query: {query[:50]}...")
+        
+        # Run the async process in a background task
+        socketio.start_background_task(main_process, query, socketio)
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
