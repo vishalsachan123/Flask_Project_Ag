@@ -1,42 +1,21 @@
-### Core Dependencies
-flask==2.3.2
-flask-socketio==5.3.4
-python-engineio==4.3.4
-python-socketio==5.7.2
-gunicorn==20.1.0
-eventlet==0.33.3
+# Core
+flask>=2.3.2
+flask-socketio>=5.3.4
+python-engineio>=4.3.4
+python-socketio>=5.7.2
 
-### Async/Web
-aiofiles==24.1.0
-aiohttp==3.9.5
-async-timeout==4.0.3
+# Production Server
+gunicorn>=20.1.0
+eventlet>=0.33.3
 
-### Security Essentials
-cryptography==44.0.2
-pyjwt==2.10.1
-python-dotenv==1.0.1
+# Async Support
+aiofiles>=24.1.0
+aiohttp>=3.9.5
 
-### Azure Services (if used)
-azure-core==1.32.0
-azure-identity==1.21.0
-azure-search-documents==11.5.2
+# Environment
+python-dotenv>=1.0.1
 
-### AI/ML Tools
-autogen-agentchat==0.4.9.2
-autogen-core==0.4.9.2
-autogen-ext==0.4.9.2
-openai==1.66.3
-langchain==0.3.20
-langchain-core==0.3.45
-tiktoken==0.9.0
-
-### Production Utilities
-orjson==3.10.15
-pydantic==2.10.6
-protobuf==5.29.3
-SQLAlchemy==2.0.39
-
-### Required Runtime
-greenlet==3.1.1
-typing-extensions==4.12.2
-certifi==2025.1.31
+# Your existing dependencies
+autogen-agentchat>=0.4.9
+openai>=1.6.0
+langchain>=0.3.0
