@@ -57,7 +57,12 @@ tourism_agent = AssistantAgent(
 
 user_proxy_agent = AssistantAgent(
     name="User_Proxy_Agent",
-    system_message="You are a validation assistant...",
+    system_message=(
+        "You are a validation assistant. Review responses from the tourism_agent "
+        "and validate the information before sending it to the user. If the response is correct, reply with 'APPROVE' to terminate the session. "
+        "If corrections are needed, suggest improvements briefly."
+
+    ),
     model_client=model_client,
     reflect_on_tool_use=True,
     model_context=BufferedChatCompletionContext(buffer_size=5),
