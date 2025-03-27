@@ -6,6 +6,10 @@ from flask_socketio import SocketIO, emit
 from agents import main_process
 import logging
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
@@ -17,7 +21,7 @@ logger = logging.getLogger(__name__)
 # SocketIO configuration
 socketio = SocketIO(
     app,
-    cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*'),
+    cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     async_mode='eventlet',
     logger=os.getenv('DEBUG', 'false').lower() == 'true',
     engineio_logger=os.getenv('DEBUG', 'false').lower() == 'true',
@@ -49,7 +53,7 @@ def handle_start_chat(data):
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
-        emit("error", {"message": "Processing error"})
+        emit("error", {"message": f"Processing error: {str(e)}"})
 
 if __name__ == "__main__":
     socketio.run(
