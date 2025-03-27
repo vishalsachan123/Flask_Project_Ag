@@ -8,9 +8,11 @@ python-socketio>=5.7.2
 gunicorn>=20.1.0
 eventlet>=0.33.3
 
-# AutoGen
-autogen==0.2.23
-autogen-ext==0.2.23
-pyautogen==0.2.23
+# AutoGen (correct versions)
+autogen>=0.8.3  # Latest stable version
+pyautogen>=0.8.3
 
 # Your other existing dependencies...
+aiofiles>=24.1.0
+aiohttp>=3.9.5
+python-dotenv>=1.0.1
