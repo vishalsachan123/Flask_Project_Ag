@@ -30,12 +30,12 @@ async def chatbot_simulation(query,conn_socketio):
    
     for response in responses:
         await asyncio.sleep(2)  # Simulate delay of 2 seconds
-        conn_socketio.emit("update", {"message": response})
+        await conn_socketio.emit("update", {"message": response})
 
 
 
 async def live_update(conn_socketio,response):
-    conn_socketio.emit("update", {"message": response,"ussage":30})
+    await conn_socketio.emit("update", {"message": response,"ussage":30})
 
 async def main_process(query,conn_socketio):
     """Start conversation and return structured JSON results."""
