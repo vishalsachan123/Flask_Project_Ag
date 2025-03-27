@@ -39,7 +39,7 @@ async def live_update(conn_socketio,response):
 
 async def main_process(query,conn_socketio):
     """Start conversation and return structured JSON results."""
-    chatbot_simulation(query,conn_socketio)
+    await chatbot_simulation(query,conn_socketio)
 
    
     
