@@ -8,14 +8,9 @@ python-socketio>=5.7.2
 gunicorn>=20.1.0
 eventlet>=0.33.3
 
-# Async Support
-aiofiles>=24.1.0
-aiohttp>=3.9.5
+# AutoGen
+autogen==0.2.23
+autogen-ext==0.2.23
+pyautogen==0.2.23
 
-# Environment
-python-dotenv>=1.0.1
-
-# Your existing dependencies
-autogen-agentchat>=0.4.9
-openai>=1.6.0
-langchain>=0.3.0
+# Your other existing dependencies...
