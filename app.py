@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch()  # Must be first import
+eventlet.monkey_patch()
 
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
@@ -7,6 +7,7 @@ import logging
 import os
 import asyncio
 from dotenv import load_dotenv
+from agents import main_process
 
 # Load environment variables
 load_dotenv()
@@ -25,26 +26,6 @@ socketio = SocketIO(
     logger=True,
     engineio_logger=True
 )
-
-async def chatbot_simulation(query, emit_fn):
-    """Simulate chatbot processing with proper socket emission"""
-    responses = [
-        f"Processing your query: {query}...",
-        "Searching for relevant information...",
-        "Analyzing data...",
-        "Finalizing the response...",
-        "Here's the result: The information you requested!"
-    ]
-    
-    for response in responses:
-        try:
-            await asyncio.sleep(2)  # Simulate processing time
-            # Use the provided emit function
-            emit_fn("update", {"message": response})
-        except Exception as e:
-            logger.error(f"Error in simulation: {str(e)}")
-            emit_fn("error", {"message": "Processing update failed"})
-            break
 
 @app.route('/health')
 def health_check():
@@ -73,7 +54,7 @@ def handle_start_chat(data):
         asyncio.set_event_loop(loop)
         
         # Run the async process with the emitter function
-        loop.run_until_complete(chatbot_simulation(query, emit_fn))
+        loop.run_until_complete(main_process(query, emit_fn))
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
