@@ -14,6 +14,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +28,19 @@ socketio = SocketIO(
     logger=True,
     engineio_logger=True
 )
+
+async def chatbot_simulation(query):
+    responses = [
+        f"Processing your query: {query}...",
+        "Searching for relevant information...",
+        "Analyzing data...",
+        "Finalizing the response...",
+        "Here’s the result: The information you requested!"
+    ]
+   
+    for response in responses:
+        await asyncio.sleep(2)  # Simulate delay of 2 seconds
+        await socketio.emit("update", {"message": response})
 
 @app.route('/health')
 def health_check():
@@ -50,7 +65,7 @@ def handle_start_chat(data):
         asyncio.set_event_loop(loop)
         
         # Run the async process
-        loop.run_until_complete(main_process(query, socketio))
+        loop.run_until_complete(chatbot_simulation(query))
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
