@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch()  # Must be first import
+eventlet.monkey_patch()
 
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
@@ -49,12 +49,24 @@ def handle_start_chat(data):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        # Run the async process
-        loop.run_until_complete(main_process(query, socketio))
-        
+        try:
+            # Add timeout for the AI processing
+            loop.run_until_complete(
+                asyncio.wait_for(
+                    main_process(query, socketio),
+                    timeout=30.0  # 30 second timeout
+                )
+            )
+        except asyncio.TimeoutError:
+            emit("error", {"message": "AI processing timed out"})
+            logger.error("AI processing timed out")
+        except Exception as e:
+            emit("error", {"message": f"AI processing error: {str(e)}"})
+            logger.error(f"AI processing failed: {str(e)}", exc_info=True)
+            
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
-        emit("error", {"message": f"Processing error: {str(e)}"})
+        emit("error", {"message": f"System error: {str(e)}"})
 
 if __name__ == "__main__":
     socketio.run(
