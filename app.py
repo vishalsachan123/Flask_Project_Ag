@@ -6,6 +6,7 @@ from flask_socketio import SocketIO, emit
 from agents import main_process
 import logging
 import os
+import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -17,13 +18,13 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# SocketIO configuration (simplified without secret key)
+# SocketIO configuration
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     async_mode='eventlet',
-    logger=os.getenv('DEBUG', 'false').lower() == 'true',
-    engineio_logger=os.getenv('DEBUG', 'false').lower() == 'true'
+    logger=True,
+    engineio_logger=True
 )
 
 @app.route('/health')
@@ -43,7 +44,13 @@ def handle_start_chat(data):
             return
             
         logger.info(f"Processing query: {query[:50]}...")
-        socketio.start_background_task(main_process, query, socketio)
+        
+        # Create new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the async process
+        loop.run_until_complete(main_process(query, socketio))
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
