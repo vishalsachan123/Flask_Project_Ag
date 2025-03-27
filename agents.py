@@ -27,16 +27,7 @@ model_client = AzureOpenAIChatCompletionClient(
     api_key=API_KEY,
 )
 
-# Add this right after creating model_client
-try:
-    test_response = await model_client.create(
-        messages=[{"role": "user", "content": "test"}],
-        max_tokens=5
-    )
-    logger.info("Azure OpenAI connection test successful")
-except Exception as e:
-    logger.error(f"Azure OpenAI connection failed: {str(e)}")
-    raise
+
 
 sys_msg = """
         You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
