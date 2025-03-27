@@ -12,22 +12,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# SocketIO configuration
+# SocketIO configuration (simplified without secret key)
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     async_mode='eventlet',
     logger=os.getenv('DEBUG', 'false').lower() == 'true',
-    engineio_logger=os.getenv('DEBUG', 'false').lower() == 'true',
-    ping_timeout=60,
-    ping_interval=25,
-    max_http_buffer_size=1e8
+    engineio_logger=os.getenv('DEBUG', 'false').lower() == 'true'
 )
 
 @app.route('/health')
@@ -47,8 +43,6 @@ def handle_start_chat(data):
             return
             
         logger.info(f"Processing query: {query[:50]}...")
-        
-        # Run the async process in a background task
         socketio.start_background_task(main_process, query, socketio)
         
     except Exception as e:
