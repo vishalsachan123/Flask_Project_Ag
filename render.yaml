@@ -1,5 +1,8 @@
 services:
   - type: web
-    name: app
-    runtime: python
-    command: gunicorn -k eventlet -w 1 --threads 4 app:socketio.run(app)
+    name: flask-gevent-app
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 4 -b 0.0.0.0:$PORT app:app"
