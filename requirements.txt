@@ -1,11 +1,11 @@
-
-
+# Flask and Flask-SocketIO
 Flask==3.0.2
 Flask-SocketIO==5.3.6
 gunicorn==21.2.0
-gevent==23.9.0
-gevent-websocket==0.10.1
 python-dotenv==1.0.1
+
+# ASGI support
+uvicorn==0.30.0
 
 # AutoGen requirements
 autogen-agentchat==0.4.9.2
