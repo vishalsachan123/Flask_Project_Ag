@@ -111,6 +111,7 @@ async def main_process(query, emit_fn):
                 elif message.source == 'Tourism_Agent':
                     c = f'Agent >> {message.source} : Response : {message.content}...\n\n'
                     tourism_agent_response = message.content
+                    logger.info(f">>>>>>>tourism_agent_response: {message.content}...")
                 else:
                     c = f'Agent >> {message.source} : {message.content[:20]}...\n\n'
                 ThoughtProcess += c
