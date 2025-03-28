@@ -73,8 +73,8 @@ async def main_process(query, emit_fn):
     except Exception as e:
         logger.error(f"Main process error: {str(e)}", exc_info=True)
         #emit_fn("error", {"message": f"Processing error: {str(e)}"})
-        live_update(emit_fn, f"Processing error: {str(e)}")
+        await live_update(emit_fn, f"Processing error: {str(e)}")
         bucket = ["call", "nhi", "lag", "rhi","call", "nhi", "lag", "rhi"]
         for i in bucket:
             time.sleep(0.5)
-            live_update(emit_fn, i)
+            await live_update(emit_fn, i)
