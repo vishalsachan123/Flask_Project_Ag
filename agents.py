@@ -1,14 +1,16 @@
 import os
-import time
 from dotenv import load_dotenv
+import json
 import asyncio
-import logging
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from autogen_agentchat.agents import AssistantAgent
+from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.messages import TextMessage
+from autogen_agentchat.base import TaskResult
+from autogen_agentchat.teams import RoundRobinGroupChat
+from tools import azure_ai_search_retriever
 from autogen_core.model_context import BufferedChatCompletionContext
-from autogen_core import CancellationToken
-
+import time
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,7 +37,18 @@ model_client = AzureOpenAIChatCompletionClient(
 )
 
 
-sys_msg = "You are a tourism agent that will answer user queries."
+sys_msg = """
+        You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
+        based on user preferences. Your role includes guiding users through an interactive trip-planning experience 
+        by gathering essential details such as travel dates, group composition, and interests. 
+        Utilize the 'azure_ai_search_retriever' tool to fetch accurate and up-to-date information from official sources, 
+        including https://visitrasalkhaimah.com/ and https://raktda.com/, to ensure data reliability. 
+        Based on the collected information, offer tailored suggestions encompassing accommodations, attractions, dining options, 
+        and transportation. Present responses in a structured markdown format to enhance readability and user engagement. 
+        Encourage users to refine their queries, and adapt your recommendations accordingly to craft a comprehensive and 
+        personalized itinerary.
+        """
+
 
 # Define Agents
 tourism_agent = AssistantAgent(
@@ -45,6 +58,25 @@ tourism_agent = AssistantAgent(
     reflect_on_tool_use=True,
     model_context=BufferedChatCompletionContext(buffer_size=5),
 )
+
+# Define Validation Agent with Auto-Approval
+user_proxy_agent = AssistantAgent(
+    name="User_Proxy_Agent",
+    system_message=(
+        "You are a validation assistant. Review responses from the tourism_agent "
+        "and validate the information before sending it to the user. If the response is correct, reply with 'APPROVE' to terminate the session. "
+        "If corrections are needed, suggest improvements briefly."
+
+    ),
+    model_client=model_client,
+    reflect_on_tool_use=True,
+    model_context=BufferedChatCompletionContext(buffer_size=5),
+)
+
+
+termination = TextMentionTermination("APPROVE")
+
+team = RoundRobinGroupChat([tourism_agent,user_proxy_agent], termination_condition=termination)
 
 
 async def live_update(emit_fn, response):
@@ -58,20 +90,56 @@ async def live_update(emit_fn, response):
 async def main_process(query, emit_fn):
     """Main conversation processing"""
     try:
-        # Get response from the agent
-        response = await tourism_agent.on_messages(
-            [TextMessage(content=query, source="user")],
-            cancellation_token=CancellationToken(),
-        )
+        ThoughtProcess = ''
+        tourism_agent_response = ''
+    
+        async for message in team.run_stream(task=query):
+            if isinstance(message, TaskResult):
+                c = 'Task Completed.\n'
+                ThoughtProcess += c
+                print(c)
+                await live_update(emit_fn,c)
+                continue
+    
+            if isinstance(message, TextMessage):
+                if message.source == 'User_Proxy_Agent':
+                    c = f'Agent >> {message.source} : Suggestions : {message.content[:20]}...\n\n'
+                elif message.source == 'user':
+                    c = f'Agent >> {message.source} : User Query : {message.content}\n\n'
+                elif message.source == 'Tourism_Agent':
+                    c = f'Agent >> {message.source} : Response : {message.content}...\n\n'
+                    tourism_agent_response = message.content
+                else:
+                    c = f'Agent >> {message.source} : {message.content[:20]}...\n\n'
+                ThoughtProcess += c
+                print(c)
+                await live_update(emit_fn,c)
+    
+            elif message.type == "ToolCallRequestEvent":
+                c = f'Agent >> {message.source}: Action: ToolCallRequestEvent : ToolName : {message.content[0].name} : Arguments : {message.content[0].arguments}\n\n'
+                ThoughtProcess += c
+                print(c)
+                await live_update(emit_fn,c)
+               
+            elif message.type == "ToolCallExecutionEvent":
+                c += f'Agent >> {message.source}: Action: ToolCallExecutionEvent : ToolName : {message.content[0].name} : isError : {message.content[0].is_error}\n\n'
+                ThoughtProcess += c
+                print(c)
+                await live_update(emit_fn,c)
+    
+    
+            else:
+                pass
+    
+        response = {
+            "ThoughtProcess" : ThoughtProcess,
+            "Finalresponse" : tourism_agent_response,
+            "total_prompt_tokens" : model_client._total_usage.prompt_tokens,
+            "total_completion_tokens" : model_client._total_usage.completion_tokens
+        }
         
-        # Print or log for debugging
-        logger.info(f"Agent Response: {response.inner_messages}")
-        
-        # Send response to client
-        if response and response.chat_message:
-            await live_update(emit_fn, str(response.chat_message.content))
-        else:
-            await live_update(emit_fn, "No response generated.")
+    
+
     
     except Exception as e:
         logger.error(f"Main process error: {str(e)}", exc_info=True)
