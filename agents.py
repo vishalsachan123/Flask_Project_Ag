@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-import json
 import asyncio
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from autogen_agentchat.agents import AssistantAgent
@@ -20,16 +19,12 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-
-
 AZURE_ENDPOINT = os.getenv('AZURE_ENDPOINT')
 API_KEY = os.getenv('API_KEY')
 DEPLOYMENT_NAME = os.getenv('DEPLOYMENT_NAME')
 OPENAI_API_VERSION = os.getenv('OPENAI_API_VERSION')
 
 # Initialize Azure OpenAI client
-
-
 model_client = AzureOpenAIChatCompletionClient(
     azure_deployment=DEPLOYMENT_NAME,
     azure_endpoint=AZURE_ENDPOINT,
@@ -37,7 +32,6 @@ model_client = AzureOpenAIChatCompletionClient(
     api_version=OPENAI_API_VERSION,
     api_key=API_KEY,
 )
-
 
 sys_msg = """
         You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
@@ -49,8 +43,7 @@ sys_msg = """
         and transportation. Present responses in a structured markdown format to enhance readability and user engagement. 
         Encourage users to refine their queries, and adapt your recommendations accordingly to craft a comprehensive and 
         personalized itinerary.
-        """
-
+"""
 
 # Define Agents
 tourism_agent = AssistantAgent(
@@ -68,23 +61,20 @@ user_proxy_agent = AssistantAgent(
         "You are a validation assistant. Review responses from the tourism_agent "
         "and validate the information before sending it to the user. If the response is correct, reply with 'APPROVE' to terminate the session. "
         "If corrections are needed, suggest improvements briefly."
-
     ),
     model_client=model_client,
     reflect_on_tool_use=True,
     model_context=BufferedChatCompletionContext(buffer_size=5),
 )
 
-
 termination = TextMentionTermination("APPROVE")
-
-team = RoundRobinGroupChat([tourism_agent,user_proxy_agent], termination_condition=termination)
+team = RoundRobinGroupChat([tourism_agent, user_proxy_agent], termination_condition=termination)
 
 
 async def live_update(emit_fn, response):
     """Send live updates to client"""
     try:
-        emit_fn("update", {"message": response, "usage": 30})  # Corrected typo from 'ussage' to 'usage'
+        emit_fn("update", {"message": response, "usage": 30})
     except Exception as e:
         logger.error(f"Live update failed: {str(e)}")
 
@@ -94,15 +84,14 @@ async def main_process(query, emit_fn):
     try:
         ThoughtProcess = ''
         tourism_agent_response = ''
-    
+
         async for message in team.run_stream(task=query):
             if isinstance(message, TaskResult):
                 c = 'Task Completed.\n'
                 ThoughtProcess += c
-                print(c)
-                await live_update(emit_fn,c)
+                await live_update(emit_fn, c)
                 continue
-    
+
             if isinstance(message, TextMessage):
                 if message.source == 'User_Proxy_Agent':
                     c = f'Agent >> {message.source} : Suggestions : {message.content[:20]}...\n\n'
@@ -111,44 +100,20 @@ async def main_process(query, emit_fn):
                 elif message.source == 'Tourism_Agent':
                     c = f'Agent >> {message.source} : Response : {message.content}...\n\n'
                     tourism_agent_response = message.content
-                    logger.info(f">>>>>>>tourism_agent_response: {message.content}...")
                 else:
                     c = f'Agent >> {message.source} : {message.content[:20]}...\n\n'
-                ThoughtProcess += c
-                print(c)
-                await live_update(emit_fn,c)
-    
-            elif message.type == "ToolCallRequestEvent":
-                c = f'Agent >> {message.source}: Action: ToolCallRequestEvent : ToolName : {message.content[0].name} : Arguments : {message.content[0].arguments}\n\n'
-                ThoughtProcess += c
-                print(c)
-                await live_update(emit_fn,c)
-               
-            elif message.type == "ToolCallExecutionEvent":
-                c += f'Agent >> {message.source}: Action: ToolCallExecutionEvent : ToolName : {message.content[0].name} : isError : {message.content[0].is_error}\n\n'
-                ThoughtProcess += c
-                print(c)
-                await live_update(emit_fn,c)
-    
-    
-            else:
-                pass
-    
-        response = {
-            "ThoughtProcess" : ThoughtProcess,
-            "Finalresponse" : tourism_agent_response,
-            "total_prompt_tokens" : model_client._total_usage.prompt_tokens,
-            "total_completion_tokens" : model_client._total_usage.completion_tokens
-        }
-        
-    
 
-    
+                ThoughtProcess += c
+                await live_update(emit_fn, c)
+
+        response = {
+            "ThoughtProcess": ThoughtProcess,
+            "Finalresponse": tourism_agent_response,
+            "total_prompt_tokens": model_client._total_usage.prompt_tokens,
+            "total_completion_tokens": model_client._total_usage.completion_tokens
+        }
+        await live_update(emit_fn, "Task completed successfully!")
+
     except Exception as e:
         logger.error(f"Main process error: {str(e)}", exc_info=True)
-        #emit_fn("error", {"message": f"Processing error: {str(e)}"})
         await live_update(emit_fn, f"Processing error: {str(e)}")
-        bucket = ["call", "nhi", "lag", "rhi","call", "nhi", "lag", "rhi"]
-        for i in bucket:
-            time.sleep(0.5)
-            await live_update(emit_fn, i)
