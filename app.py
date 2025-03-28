@@ -1,6 +1,7 @@
 from gevent import monkey
 monkey.patch_all()
 
+from gevent import spawn
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import logging
@@ -8,6 +9,16 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from agents import main_process
+
+
+
+def run_async_task(query, emit_fn):
+    """Run the async main_process with its own event loop"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(main_process(query, emit_fn))
+    loop.close()
+
 
 # Load environment variables
 load_dotenv()
@@ -53,11 +64,9 @@ def handle_start_chat(data):
             emit(event, data, room=request.sid)
         
         # Create new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         
-        # Run the async process with the emitter function
-        loop.run_until_complete(main_process(query, emit_fn))
+        # Correctly spawn the async task using gevent
+        spawn(run_async_task, query, emit_fn)
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
