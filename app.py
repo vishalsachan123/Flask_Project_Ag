@@ -18,7 +18,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# SocketIO configuration with gevent and threading
+# SocketIO configuration with gevent
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
@@ -27,18 +27,15 @@ socketio = SocketIO(
     engineio_logger=True
 )
 
-
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
     return {'status': 'healthy'}, 200
 
-
 @app.route("/myhome")
 def index():
     """Render home page"""
     return render_template("myhome.html")
-
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
@@ -48,20 +45,23 @@ def handle_start_chat(data):
         if not query:
             emit("error", {"message": "Empty query"}, room=request.sid)
             return
-
+            
         logger.info(f"Processing query: {query[:50]}...")
-
+        
         # Create an emitter function that maintains socket context
         def emit_fn(event, data):
             emit(event, data, room=request.sid)
-
-        # Run the async process in a background thread
-        socketio.start_background_task(asyncio.run, main_process(query, emit_fn))
-
+        
+        # Create new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the async process with the emitter function
+        loop.run_until_complete(main_process(query, emit_fn))
+        
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
         emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
-
 
 if __name__ == "__main__":
     socketio.run(
