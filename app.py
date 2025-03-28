@@ -40,30 +40,42 @@ def index():
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
-    """Handle incoming chat requests"""
+    """Handle incoming chat requests asynchronously."""
     try:
         query = data.get("query", "").strip()
         if not query:
-            emit("error", {"message": "Empty query"}, room=request.sid)
+            socketio.emit("error", {"message": "Empty query"}, room=request.sid)
             return
-            
+
         logger.info(f"Processing query: {query[:50]}...")
 
-        # Create an emitter function that maintains socket context
-        def emit_fn(event, data):
-            """Emit data to the client"""
-            emit(event, data, room=request.sid)
-
-        # Run the async process without conflicting with Flask-SocketIO
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        # Run the main AutoGen process
-        loop.run_until_complete(main_process(query, emit_fn))
+        # Use start_background_task to run async task safely
+        socketio.start_background_task(target=run_async_chat, query, request.sid)
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
-        emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
+        socketio.emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
+
+
+# Define async task separately
+def run_async_chat(query, sid):
+    """Run the AutoGen process in a background task."""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        async def process_chat():
+            def emit_fn(event, data):
+                """Emit data to the client"""
+                socketio.emit(event, data, room=sid)
+
+            # Run the main AutoGen process asynchronously
+            await main_process(query, emit_fn)
+
+        loop.run_until_complete(process_chat())
+    except Exception as e:
+        logger.error(f"Background task error: {str(e)}", exc_info=True)
+        socketio.emit("error", {"message": f"Background task error: {str(e)}"}, room=sid)
 
 if __name__ == "__main__":
     socketio.run(
