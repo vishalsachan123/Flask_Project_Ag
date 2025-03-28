@@ -16,15 +16,12 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-AZURE_ENDPOINT = 'https://openai-gpt-models.openai.azure.com/'
-API_KEY = 'utbiotU16jWZcb0BWJM9nub2Ow9RL2lNfk1L3hr7Pz7e5mLIBH8AJQQJ99AKACHYHv6XJ3w3AAABACOGctb1'
-DEPLOYMENT_NAME = 'gpt-4o'
-OPENAI_API_VERSION = '2024-08-01-preview'
 
-# AZURE_ENDPOINT = os.getenv('AZURE_ENDPOINT')
-# API_KEY = os.getenv('API_KEY')
-# DEPLOYMENT_NAME = os.getenv('DEPLOYMENT_NAME')
-# OPENAI_API_VERSION = os.getenv('OPENAI_API_VERSION')
+
+AZURE_ENDPOINT = os.getenv('AZURE_ENDPOINT')
+API_KEY = os.getenv('API_KEY')
+DEPLOYMENT_NAME = os.getenv('DEPLOYMENT_NAME')
+OPENAI_API_VERSION = os.getenv('OPENAI_API_VERSION')
 
 # Initialize Azure OpenAI client
 
