@@ -20,14 +20,16 @@ DEPLOYMENT_NAME = os.getenv('DEPLOYMENT_NAME')
 OPENAI_API_VERSION = os.getenv('OPENAI_API_VERSION')
 
 # Initialize Azure OpenAI client
+
+
 model_client = AzureOpenAIChatCompletionClient(
     azure_deployment=DEPLOYMENT_NAME,
     azure_endpoint=AZURE_ENDPOINT,
-    model="gpt-4",
+    model="gpt-4o-2024-05-13",
     api_version=OPENAI_API_VERSION,
     api_key=API_KEY,
-    timeout=30.0
 )
+
 
 sys_msg = "You are a tourism agent that will answer user queries."
 
