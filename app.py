@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
 
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
@@ -18,25 +18,28 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# SocketIO configuration
+# SocketIO configuration with gevent
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
-    async_mode='eventlet',
+    async_mode='gevent',
     logger=True,
     engineio_logger=True
 )
 
 @app.route('/health')
 def health_check():
+    """Health check endpoint"""
     return {'status': 'healthy'}, 200
 
 @app.route("/myhome")
 def index():
+    """Render home page"""
     return render_template("myhome.html")
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
+    """Handle incoming chat requests"""
     try:
         query = data.get("query", "").strip()
         if not query:
