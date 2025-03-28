@@ -11,6 +11,8 @@ from autogen_agentchat.teams import RoundRobinGroupChat
 from tools import azure_ai_search_retriever
 from autogen_core.model_context import BufferedChatCompletionContext
 import time
+import logging
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
