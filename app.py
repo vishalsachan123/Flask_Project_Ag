@@ -1,72 +1,67 @@
 from gevent import monkey
-monkey.patch_all()
+monkey.patch_all(thread=False, select=False)  # Crucial for asyncio compatibility
 
-from flask import Flask, render_template, request
+from flask import Flask, request
 from flask_socketio import SocketIO, emit
 import logging
 import os
 import asyncio
+from threading import Lock
 from dotenv import load_dotenv
-from agents import main_process
 
-# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# SocketIO configuration with gevent
 socketio = SocketIO(
     app,
-    cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     async_mode='gevent',
+    cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     logger=True,
     engineio_logger=True
 )
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    return {'status': 'healthy'}, 200
-
-@app.route("/myhome")
-def index():
-    """Render home page"""
-    return render_template("myhome.html")
+# Thread-safe task management
+task_lock = Lock()
+active_tasks = {}
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
-    """Handle incoming chat requests"""
+    def emit_fn(event, data):
+        emit(event, data, room=request.sid)
+    
+    query = data.get("query", "").strip()
+    if not query:
+        emit_fn("error", {"message": "Empty query"})
+        return
+
+    logger.info(f"Processing: {query[:50]}...")
+    
+    # Create isolated event loop
+    loop = asyncio.new_event_loop()
+    
     try:
-        query = data.get("query", "").strip()
-        if not query:
-            emit("error", {"message": "Empty query"}, room=request.sid)
-            return
-            
-        logger.info(f"Processing query: {query[:50]}...")
+        from agents import main_process
+        task = loop.create_task(main_process(query, emit_fn))
         
-        # Create an emitter function that maintains socket context
-        def emit_fn(event, data):
-            emit(event, data, room=request.sid)
+        with task_lock:
+            active_tasks[request.sid] = (loop, task)
         
-        # Create new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Run the async process with the emitter function
-        loop.run_until_complete(main_process(query, emit_fn))
+        loop.run_until_complete(task)
         
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}", exc_info=True)
-        emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
+        logger.error(f"Error: {str(e)}")
+        emit_fn("error", {"message": str(e)})
+    finally:
+        with task_lock:
+            if request.sid in active_tasks:
+                loop.close()
+                del active_tasks[request.sid]
 
-if __name__ == "__main__":
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=int(os.getenv('PORT', '5000')),
-        debug=os.getenv('DEBUG', 'false').lower() == 'true'
-    )
+@socketio.on("disconnect")
+def handle_disconnect():
+    with task_lock:
+        if request.sid in active_tasks:
+            loop, task = active_tasks.pop(request.sid)
+            task.cancel()
+            loop.stop()
+            loop.close()
