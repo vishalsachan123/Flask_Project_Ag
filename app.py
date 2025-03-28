@@ -10,12 +10,22 @@ from dotenv import load_dotenv
 from agents import main_process
 
 
-def run_async_task(query, emit_fn):
-    """Run the async main_process with its own event loop"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(main_process(query, emit_fn))
-    loop.close()
+async def run_async_task(query, sid):
+    """Run the async main_process with its own event loop and emit safely"""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        # Use socketio.emit inside the loop
+        async def safe_emit(event, data):
+            socketio.emit(event, data, room=sid)
+
+        # Pass safe_emit instead of emit()
+        await main_process(query, safe_emit)
+
+    except Exception as e:
+        logger.error(f"Error in task: {str(e)}", exc_info=True)
+        socketio.emit("error", {"message": f"Processing error: {str(e)}"}, room=sid)
 
 
 # Load environment variables
@@ -56,14 +66,10 @@ def handle_start_chat(data):
             return
             
         logger.info(f"Processing query: {query[:50]}...")
-        
-        # Create an emitter function that maintains socket context
-        def emit_fn(event, data):
-            emit(event, data, room=request.sid)
-        
-        # Use socketio.start_background_task to maintain request context
-        socketio.start_background_task(run_async_task, query, emit_fn)
-        
+
+        # Use socketio.start_background_task with safe emit
+        socketio.start_background_task(run_async_task, query, request.sid)
+
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
         emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
