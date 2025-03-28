@@ -9,27 +9,6 @@ import asyncio
 from dotenv import load_dotenv
 from agents import main_process
 
-
-def run_async_task(query, sid):
-    """Run the async main_process with its own event loop in a synchronous wrapper"""
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        # Safe emit function that maintains socket context
-        async def safe_emit(event, data):
-            socketio.emit(event, data, room=sid)
-
-        # Run the async function using loop.run_until_complete()
-        loop.run_until_complete(main_process(query, safe_emit))
-
-    except Exception as e:
-        logger.error(f"Error in task: {str(e)}", exc_info=True)
-        socketio.emit("error", {"message": f"Processing error: {str(e)}"}, room=sid)
-    finally:
-        loop.close()
-
-
 # Load environment variables
 load_dotenv()
 
@@ -39,7 +18,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# SocketIO configuration with gevent
+# SocketIO configuration with gevent and threading
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
@@ -48,10 +27,12 @@ socketio = SocketIO(
     engineio_logger=True
 )
 
+
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
     return {'status': 'healthy'}, 200
+
 
 @app.route("/myhome")
 def index():
@@ -67,11 +48,15 @@ def handle_start_chat(data):
         if not query:
             emit("error", {"message": "Empty query"}, room=request.sid)
             return
-            
+
         logger.info(f"Processing query: {query[:50]}...")
 
-        # Run the async task safely as a background task
-        socketio.start_background_task(run_async_task, query, request.sid)
+        # Create an emitter function that maintains socket context
+        def emit_fn(event, data):
+            emit(event, data, room=request.sid)
+
+        # Run the async process in a background thread
+        socketio.start_background_task(asyncio.run, main_process(query, emit_fn))
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
