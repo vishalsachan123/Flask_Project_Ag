@@ -16,16 +16,18 @@ async def run_async_task(query, sid):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Use socketio.emit inside the loop
+        # Safe emit function that maintains context
         async def safe_emit(event, data):
             socketio.emit(event, data, room=sid)
 
-        # Pass safe_emit instead of emit()
+        # Call the main process with safe emit
         await main_process(query, safe_emit)
 
     except Exception as e:
         logger.error(f"Error in task: {str(e)}", exc_info=True)
         socketio.emit("error", {"message": f"Processing error: {str(e)}"}, room=sid)
+    finally:
+        loop.close()
 
 
 # Load environment variables
@@ -56,6 +58,7 @@ def index():
     """Render home page"""
     return render_template("myhome.html")
 
+
 @socketio.on("start_chat")
 def handle_start_chat(data):
     """Handle incoming chat requests"""
@@ -67,12 +70,13 @@ def handle_start_chat(data):
             
         logger.info(f"Processing query: {query[:50]}...")
 
-        # Use socketio.start_background_task with safe emit
+        # Run async task with safe emit using socketio.start_background_task
         socketio.start_background_task(run_async_task, query, request.sid)
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
         emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
+
 
 if __name__ == "__main__":
     socketio.run(
