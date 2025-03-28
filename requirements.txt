@@ -6,6 +6,7 @@ python-dotenv==1.0.1
 gevent==23.9.0
 gevent-websocket==0.10.1
 
+
 # ASGI support
 uvicorn==0.30.0
 
