@@ -1,83 +1,79 @@
 import os
-import time
-from dotenv import load_dotenv
 import asyncio
 import logging
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.messages import TextMessage
+from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
+from autogen_agentchat.groupchat import GroupChat
+from autogen_agentchat.types import TextMessage
 from autogen_core.model_context import BufferedChatCompletionContext
-from autogen_core import CancellationToken
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-
-
-
-AZURE_ENDPOINT = os.getenv('AZURE_ENDPOINT')
-API_KEY = os.getenv('API_KEY')
-DEPLOYMENT_NAME = os.getenv('DEPLOYMENT_NAME')
-OPENAI_API_VERSION = os.getenv('OPENAI_API_VERSION')
-
-# Initialize Azure OpenAI client
-
-
+# Initialize clients and agents
 model_client = AzureOpenAIChatCompletionClient(
-    azure_deployment=DEPLOYMENT_NAME,
-    azure_endpoint=AZURE_ENDPOINT,
+    azure_deployment=os.getenv('DEPLOYMENT_NAME'),
+    azure_endpoint=os.getenv('AZURE_ENDPOINT'),
     model="gpt-4o-2024-05-13",
-    api_version=OPENAI_API_VERSION,
-    api_key=API_KEY,
+    api_version=os.getenv('OPENAI_API_VERSION'),
+    api_key=os.getenv('API_KEY'),
 )
 
+def create_agents():
+    """Initialize agent team with proper async context"""
+    tourism_agent = AssistantAgent(
+        name="Tourism_Agent",
+        system_message="You are a tourism expert...",
+        model_client=model_client,
+        model_context=BufferedChatCompletionContext(buffer_size=5)
+    )
 
-sys_msg = "You are a tourism agent that will answer user queries."
+    validator = UserProxyAgent(
+        name="Validator",
+        system_message="Validate responses. Reply APPROVE if correct.",
+        human_input_mode="NEVER"
+    )
 
-# Define Agents
-tourism_agent = AssistantAgent(
-    name="Tourism_Agent",
-    system_message=sys_msg,
-    model_client=model_client,
-    reflect_on_tool_use=True,
-    model_context=BufferedChatCompletionContext(buffer_size=5),
-)
+    group_chat = GroupChat(
+        agents=[tourism_agent, validator],
+        messages=[],
+        max_round=10
+    )
 
+    return tourism_agent, validator, group_chat
 
 async def live_update(emit_fn, response):
-    """Send live updates to client"""
+    """Thread-safe updates"""
     try:
-        emit_fn("update", {"message": response, "usage": 30})  # Corrected typo from 'ussage' to 'usage'
+        emit_fn("update", {"message": response})
     except Exception as e:
-        logger.error(f"Live update failed: {str(e)}")
-
+        logger.error(f"Update failed: {str(e)}")
 
 async def main_process(query, emit_fn):
-    """Main conversation processing"""
+    """Modified to handle team chat"""
     try:
-        # Get response from the agent
-        response = await tourism_agent.on_messages(
-            [TextMessage(content=query, source="user")],
-            cancellation_token=CancellationToken(),
+        tourism_agent, validator, group_chat = create_agents()
+        
+        await live_update(emit_fn, "Starting conversation...")
+        
+        # Initiate chat
+        await tourism_agent.initiate_chat(
+            recipient=validator,
+            message=query,
+            callback=lambda msg: asyncio.create_task(
+                live_update(emit_fn, str(msg))
+            )
         )
         
-        # Print or log for debugging
-        logger.info(f"Agent Response: {response.inner_messages}")
+        # Get final response
+        final_response = group_chat.messages[-1].content
+        await live_update(emit_fn, f"Final response: {final_response}")
         
-        # Send response to client
-        if response and response.chat_message:
-            await live_update(emit_fn, str(response.chat_message.content))
-        else:
-            await live_update(emit_fn, "No response generated.")
-    
     except Exception as e:
-        logger.error(f"Main process error: {str(e)}", exc_info=True)
-        #emit_fn("error", {"message": f"Processing error: {str(e)}"})
-        await live_update(emit_fn, f"Processing error: {str(e)}")
-        bucket = ["call", "nhi", "lag", "rhi","call", "nhi", "lag", "rhi"]
-        for i in bucket:
-            time.sleep(0.5)
-            await live_update(emit_fn, i)
+        logger.error(f"Process error: {str(e)}", exc_info=True)
+        await live_update(emit_fn, f"Error: {str(e)}")
+        # Fallback messages
+        for msg in ["Processing", "Still", "Working"]:
+            await asyncio.sleep(0.5)
+            await live_update(emit_fn, msg)
