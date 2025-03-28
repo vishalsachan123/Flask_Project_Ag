@@ -1,7 +1,6 @@
 from gevent import monkey
 monkey.patch_all()
 
-from gevent import spawn
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import logging
@@ -9,7 +8,6 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from agents import main_process
-
 
 
 def run_async_task(query, emit_fn):
@@ -63,10 +61,8 @@ def handle_start_chat(data):
         def emit_fn(event, data):
             emit(event, data, room=request.sid)
         
-        # Create new event loop for this thread
-        
-        # Correctly spawn the async task using gevent
-        spawn(run_async_task, query, emit_fn)
+        # Use socketio.start_background_task to maintain request context
+        socketio.start_background_task(run_async_task, query, emit_fn)
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
