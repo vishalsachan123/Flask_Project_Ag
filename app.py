@@ -16,12 +16,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # SocketIO configuration with threading to avoid conflicts with AutoGen
+
+
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     async_mode='threading',  # Avoid gevent/eventlet issues
     logger=True,
-    engineio_logger=True
+    engineio_logger=True,
+    ping_timeout=60,  # Wait 60 seconds for a pong
+    ping_interval=25  # Send ping every 25 seconds
 )
 
 @app.route('/health')
@@ -66,5 +70,5 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=int(os.getenv('PORT', '5000')),
-        debug=os.getenv('DEBUG', 'false').lower() == 'true'
+        debug=False
     )
