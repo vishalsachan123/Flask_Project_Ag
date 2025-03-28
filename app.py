@@ -50,7 +50,7 @@ def handle_start_chat(data):
         logger.info(f"Processing query: {query[:50]}...")
 
         # Use start_background_task to run async task safely
-        socketio.start_background_task(target=run_async_chat, query, request.sid)
+        socketio.start_background_task(run_async_chat, query, request.sid)
 
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
