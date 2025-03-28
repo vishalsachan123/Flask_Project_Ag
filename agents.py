@@ -71,4 +71,5 @@ async def main_process(query, emit_fn):
     
     except Exception as e:
         logger.error(f"Main process error: {str(e)}", exc_info=True)
-        emit_fn("error", {"message": f"Processing error: {str(e)}"})
+        #emit_fn("error", {"message": f"Processing error: {str(e)}"})
+        live_update(emit_fn, f"Processing error: {str(e)}")
