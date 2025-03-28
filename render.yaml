@@ -1,5 +1,5 @@
 services:
   - type: web
-    name: myapp
+    name: app
     runtime: python
     command: gunicorn -k eventlet -w 1 --threads 4 app:socketio.run(app)
