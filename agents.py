@@ -69,7 +69,7 @@ termination = TextMentionTermination("APPROVE")
 team = RoundRobinGroupChat([tourism_agent,user_proxy_agent], termination_condition=termination)
 
 async def live_update(conn_socketio,response):
-    conn_socketio.emit("update", {"message": response,"ussage":30})
+    conn_socketio("update", {"message": response,"ussage":30})
 
 async def main_process(query,conn_socketio):
     """Start conversation and return structured JSON results."""
