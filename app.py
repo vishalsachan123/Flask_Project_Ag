@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-agent_manager = TourismAgentManager()
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
