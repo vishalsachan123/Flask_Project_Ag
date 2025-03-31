@@ -21,6 +21,7 @@ azure-identity>=1.10.0
 # OpenAI requirements
 openai>=1.0.0
 tiktoken>=0.5.0
+numpy>=1.20.0  # <-- ADD THIS LINE
 
 # Essential utilities
 requests>=2.28.0
