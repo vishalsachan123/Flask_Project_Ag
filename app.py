@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()
+
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 from agent_ki_class import TourismAgentManager  # Updated import
@@ -9,7 +12,7 @@ from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 
-
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -25,8 +28,18 @@ socketio = SocketIO(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+service_endpoint = os.getenv('service_endpoint')
+key = os.getenv('key')
+indexname = os.getenv('indexname')
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
+    return {'status': 'healthy'}, 200
+
+@app.route("/myhome")
+def index():
+    return render_template("myhome.html")
 
 
 @socketio.on("start_chat")
@@ -60,9 +73,7 @@ async def async_process_query(query, conn_socketio):
         api_key=os.getenv('API_KEY'),
         )
 
-        service_endpoint = os.getenv('service_endpoint')
-        key = os.getenv('key')
-        indexname = os.getenv('indexname')
+        
 
         search_client = SearchClient(service_endpoint, indexname, AzureKeyCredential(key))
 
@@ -73,9 +84,6 @@ async def async_process_query(query, conn_socketio):
     except Exception as e:
         logger.error(f"error: {str(e)}", exc_info=True)
 
-@app.route("/myhome")
-def index():
-    return render_template("myhome.html")
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)),debug = False)
