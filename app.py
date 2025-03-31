@@ -11,6 +11,8 @@ import os
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
+from autogen_core.model_context import BufferedChatCompletionContext
+
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -30,6 +32,8 @@ socketio = SocketIO(
     logger=True,
     engineio_logger=True
 )
+
+model_context_memory=BufferedChatCompletionContext(buffer_size=6),
 
 # Azure Search Configuration
 service_endpoint = os.getenv('service_endpoint')
@@ -106,7 +110,8 @@ async def _async_process_my_query(query):
         agent_manager = TourismAgentManager(
             model_client=model_client,
             search_tool=search_tool_obj.azure_ai_search_retriever,
-            soc_con=socketio
+            soc_con=socketio,
+            memo = model_context_memory
         )
 
         # Run the async process with the emitter function

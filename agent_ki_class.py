@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class TourismAgentManager:
-    def __init__(self, model_client, search_tool, soc_con):
+    def __init__(self, model_client, search_tool, soc_con, memo):
         self.model_client = model_client
         self.azure_ai_search_retriever = search_tool
         self.conn_socketio = soc_con
+        self.buffer_memo = memo
         # System message template
         self.sys_msg = """
         You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
@@ -43,6 +44,7 @@ class TourismAgentManager:
             model_client=self.model_client,
             tools=[self.azure_ai_search_retriever],
             reflect_on_tool_use=True,
+            model_context = self.buffer_memo
         )
 
     def _init_user_proxy_agent(self):
