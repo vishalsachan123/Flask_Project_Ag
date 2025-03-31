@@ -83,11 +83,11 @@ class TourismAgentManager:
 
                 elif isinstance(message, TextMessage):
                     if message.source == "User_Proxy_Agent":
-                        c = f"Agent >> {message.source} : Suggestions : {message.content[:20]}...\n\n"
+                        c = f"Agent >> {message.source} : Suggestions : {message.content}...\n\n"
                     elif message.source == "user":
                         c = f"Agent >> {message.source} : User Query : {message.content}\n\n"
                     elif message.source == "Tourism_Agent":
-                        c = f"Agent >> {message.source} : Response : {message.content[:20]}...\n\n"
+                        c = f"Agent >> {message.source} : Response : {message.content}...\n\n"
                         tourism_agent_response = message.content
                     else:
                         c = f"Agent >> {message.source} : {message.content[:20]}...\n\n"
