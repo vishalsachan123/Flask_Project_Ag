@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 class TourismAgentManager:
-    def __init__(self,model_client,search_tool):
+    def __init__(self,model_client,search_tool,soc_con):
         self.model_client = model_client
         self.azure_ai_search_retriever = search_tool
+        self.conn_socketio = soc_con
         # System message template
         self.sys_msg = """
         You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
@@ -65,7 +66,7 @@ class TourismAgentManager:
             termination_condition=termination,
         )
 
-    async def process_query(self, query, conn_socketio):
+    async def process_query(self, query):
         """Handle a single user query with live updates."""
         try:
             logger.info(f'processing query: {query}')
@@ -77,7 +78,7 @@ class TourismAgentManager:
                     c = 'Task Completed.\n'
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await conn_socketio.emit("update", {"message": c})
+                    await self.conn_socketio.emit("update", {"message": c})
                     continue
 
                 elif isinstance(message, TextMessage):
@@ -92,23 +93,23 @@ class TourismAgentManager:
                         c = f'Agent >> {message.source} : {message.content[:20]}...\n\n'
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await conn_socketio.emit("update", {"message": c})
+                    await self.conn_socketio.emit("update", {"message": c})
 
                 elif message.type == "ToolCallRequestEvent":
                     c = f'Agent >> {message.source}: Action: ToolCallRequestEvent : ToolName : {message.content[0].name} : Arguments : {message.content[0].arguments}\n\n'
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await conn_socketio.emit("update", {"message": c})
+                    await self.conn_socketio.emit("update", {"message": c})
                 
                 elif message.type == "ToolCallExecutionEvent":
                     c += f'Agent >> {message.source}: Action: ToolCallExecutionEvent : ToolName : {message.content[0].name} : isError : {message.content[0].is_error}\n\n'
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await conn_socketio.emit("update", {"message": c})
+                    await self.conn_socketio.emit("update", {"message": c})
 
 
                 else:
-                    await conn_socketio.emit("update", {"message": "some other type"})
+                    await self.conn_socketio.emit("update", {"message": "some other type"})
 
             response = {
                 "ThoughtProcess" : ThoughtProcess,
@@ -121,11 +122,11 @@ class TourismAgentManager:
 
         except Exception as e:
             logger.error(f"Main process error: {str(e)}", exc_info=True)
-            await conn_socketio.emit("update", {"message":  f"Processing error: {str(e)}"})
+            await self.conn_socketio.emit("update", {"message":  f"Processing error: {str(e)}"})
             bucket = ["call", "nhi", "lag", "rhi","call", "nhi", "lag", "rhi"]
             for i in bucket:
                 time.sleep(0.5)
-                await conn_socketio.emit("update", {"message":  i})
+                await self.conn_socketio.emit("update", {"message":  i})
             
         
 

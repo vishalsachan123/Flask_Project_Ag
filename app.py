@@ -83,9 +83,10 @@ def handle_start_chat(data):
         agent_manager = TourismAgentManager(
             model_client=model_client,
             search_tool=search_tool_obj.azure_ai_search_retriever
+            soc_con=socketio
         )
 
-        loop.run_until_complete(agent_manager.process_query(query, socketio))
+        loop.run_until_complete(agent_manager.process_query(query))
 
         
     except Exception as e:
