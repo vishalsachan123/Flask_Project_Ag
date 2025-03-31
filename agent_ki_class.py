@@ -57,7 +57,7 @@ class TourismAgentManager:
                 "If corrections are needed, suggest improvements briefly."
             ),
             model_client=self.model_client,
-            model_context = self.shared_context
+            model_context = self.shared_context,
             reflect_on_tool_use=True,
         )
 
