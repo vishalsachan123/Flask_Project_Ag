@@ -57,7 +57,10 @@ def index():
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
-    """Handle chat initiation from client"""
+    if not hasattr(socketio, 'connected') or not socketio.connected:
+        logger.error("SocketIO not connected when start_chat received")
+        return
+    
     query = data.get("query", "").strip()
     
     if not query:
@@ -73,7 +76,15 @@ def handle_start_chat(data):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                loop.run_until_complete(async_process_query(query, socketio))
+                # Create a task and add a done callback
+                task = loop.create_task(async_process_query(query, socketio))
+                task.add_done_callback(lambda t: loop.stop())
+                loop.run_forever()
+                
+                # Check if task completed successfully
+                if task.done() and not task.cancelled():
+                    if task.exception():
+                        logger.error(f"Task failed: {task.exception()}")
             except Exception as e:
                 logger.error(f"Background task error: {str(e)}", exc_info=True)
                 socketio.emit("error", {"message": str(e)})
