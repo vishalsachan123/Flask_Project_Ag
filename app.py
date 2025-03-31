@@ -28,9 +28,7 @@ socketio = SocketIO(
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
     async_mode='gevent',
     logger=True,
-    engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25
+    engineio_logger=True
 )
 
 # Azure Search Configuration
@@ -40,16 +38,9 @@ indexname = os.getenv('indexname')
 
 @app.route('/health')
 def health_check():
-    """Comprehensive health check endpoint"""
-    try:
-        return {
-            'status': 'healthy',
-            'services': ['flask', 'socketio'],
-            'environment': os.getenv('FLASK_ENV', 'production')
-        }, 200
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return {'status': 'unhealthy', 'error': str(e)}, 500
+    """Health check endpoint"""
+    return {'status': 'healthy'}, 200
+
 
 @app.route("/myhome")
 def index():
@@ -57,9 +48,6 @@ def index():
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
-    if not hasattr(socketio, 'connected') or not socketio.connected:
-        logger.error("SocketIO not connected when start_chat received")
-        return
     
     query = data.get("query", "").strip()
     
@@ -71,33 +59,34 @@ def handle_start_chat(data):
     logger.info(f"Processing query: {query[:50]}...")
     
     try:
-        # Properly wrap the async function for background execution
-        def run_async_query():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                # Create a task and add a done callback
-                task = loop.create_task(async_process_query(query, socketio))
-                task.add_done_callback(lambda t: loop.stop())
-                loop.run_forever()
-                
-                # Check if task completed successfully
-                if task.done() and not task.cancelled():
-                    if task.exception():
-                        logger.error(f"Task failed: {task.exception()}")
-            except Exception as e:
-                logger.error(f"Background task error: {str(e)}", exc_info=True)
-                socketio.emit("error", {"message": str(e)})
-            finally:
-                loop.close()
+        model_client = AzureOpenAIChatCompletionClient(
+            azure_deployment=os.getenv('DEPLOYMENT_NAME'),
+            azure_endpoint=os.getenv('AZURE_ENDPOINT'),
+            model="gpt-4o-2024-05-13",
+            api_version=os.getenv('OPENAI_API_VERSION'),
+            api_key=os.getenv('API_KEY'),
+        )
+
+        # Initialize Azure Search client
+        search_client = SearchClient(
+            service_endpoint, 
+            indexname, 
+            AzureKeyCredential(key)
+        )
         
-        socketio.start_background_task(run_async_query)
+        search_tool_obj = AzureAISearchTool(search_client=search_client)
+        
+        # Initialize and use agent manager
+        agent_manager = TourismAgentManager(
+            model_client=model_client,
+            search_tool=search_tool_obj.azure_ai_search_retriever
+        )
         
     except Exception as e:
         logger.error(f"Chat initialization error: {str(e)}", exc_info=True)
         socketio.emit("error", {"message": f"Failed to start chat: {str(e)}"})
 
-async def async_process_query(query, conn_socketio):
+def async_process_query(query, conn_socketio):
     """Process user query asynchronously"""
     try:
         # Initialize Azure OpenAI client
@@ -123,14 +112,23 @@ async def async_process_query(query, conn_socketio):
             model_client=model_client,
             search_tool=search_tool_obj.azure_ai_search_retriever
         )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        await agent_manager.process_query(query, conn_socketio)
+        # Run the async process with the emitter function
+        loop.run_until_complete(agent_manager.process_query(query, conn_socketio))
+        
         
     except Exception as e:
         logger.error(f"Query processing error: {str(e)}", exc_info=True)
-        await conn_socketio.emit("error", {
+        conn_socketio.emit("error", {
             "message": f"Failed to process query: {str(e)}"
         })
+
+    finally:
+        loop.close()
+        del search_client,model_client,agent_manager
 
 if __name__ == "__main__":
     socketio.run(
@@ -138,5 +136,4 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         port=int(os.environ.get("PORT", 5000)),
         debug=False,
-        use_reloader=False
     )
