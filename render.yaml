@@ -1,10 +1,8 @@
 services:
   - type: web
-    name: flask-uvicorn-app
+    name: flask-socketio-app
     env: python
     plan: free
     region: oregon
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 -b 0.0.0.0:5000 app:app
-
-
+    startCommand: gunicorn --worker-class gevent --bind 0.0.0.0:$PORT app:app

@@ -1,23 +1,18 @@
-from gevent import monkey
-monkey.patch_all()
-
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template
+from flask_socketio import SocketIO
+from agent_ki_class import TourismAgentManager  # Updated import
+from tool_ki_class import AzureAISearchTool
 import logging
 import os
+from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
+from azure.search.documents import SearchClient
+from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
-from agents import main_process
 
-# Load environment variables
-load_dotenv()
+
 
 app = Flask(__name__)
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Use gevent for SocketIO
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('ALLOWED_ORIGINS', '*').split(','),
@@ -26,42 +21,62 @@ socketio = SocketIO(
     engineio_logger=True
 )
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    return {'status': 'healthy'}, 200
+# Initialize manager (stateless, creates agents per request)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@app.route("/myhome")
-def index():
-    """Render home page"""
-    return render_template("myhome.html")
+load_dotenv()
+
+
+agent_manager = TourismAgentManager()
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
-    """Handle incoming chat requests"""
+    query = data["query"]
+    
     try:
-        query = data.get("query", "").strip()
         if not query:
-            emit("error", {"message": "Empty query"}, room=request.sid)
+            logger.info(f"Empty query.")
             return
-            
         logger.info(f"Processing query: {query[:50]}...")
 
-        # Define emitter to maintain socket context
-        def emit_fn(event, data):
-            emit(event, data, room=request.sid)
-
-        # Run the async process directly
-        main_process(query, emit_fn)
-        
+        # Run in background to avoid blocking
+        socketio.start_background_task(
+        async_process_query, 
+        query=query,
+        conn_socketio=socketio
+        )
     except Exception as e:
         logger.error(f"Chat error: {str(e)}", exc_info=True)
-        emit("error", {"message": f"Processing error: {str(e)}"}, room=request.sid)
+
+
+async def async_process_query(query, conn_socketio):
+    try:
+
+        model_client = AzureOpenAIChatCompletionClient(
+        azure_deployment=os.getenv('DEPLOYMENT_NAME'),
+        azure_endpoint=os.getenv('AZURE_ENDPOINT'),
+        model="gpt-4o-2024-05-13",
+        api_version=os.getenv('OPENAI_API_VERSION'),
+        api_key=os.getenv('API_KEY'),
+        )
+
+        service_endpoint = os.getenv('service_endpoint')
+        key = os.getenv('key')
+        indexname = os.getenv('indexname')
+
+        search_client = SearchClient(service_endpoint, indexname, AzureKeyCredential(key))
+
+        search_tool_obj  = AzureAISearchTool(search_client=search_client)
+        agent_manager = TourismAgentManager(model_client=model_client,search_tool= search_tool_obj.azure_ai_search_retriever)
+        await agent_manager.process_query(query, conn_socketio)
+    
+    except Exception as e:
+        logger.error(f"error: {str(e)}", exc_info=True)
+
+@app.route("/myhome")
+def index():
+    return render_template("myhome.html")
 
 if __name__ == "__main__":
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=int(os.getenv('PORT', '5000')),
-        debug=os.getenv('DEBUG', 'false').lower() == 'true'
-    )
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
