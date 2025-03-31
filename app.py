@@ -111,7 +111,7 @@ async def _async_process_my_query(query, client_id):
         agent_manager = TourismAgentManager(
             model_client=model_client,
             search_tool=search_tool_obj.azure_ai_search_retriever,
-            soc_con=socketio
+            soc_con=socketio,
             room_id = client_id
             #shared_context = shared_model_context
         )
