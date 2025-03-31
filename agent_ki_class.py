@@ -15,7 +15,7 @@ class TourismAgentManager:
         self.model_client = model_client
         self.azure_ai_search_retriever = search_tool
         self.conn_socketio = soc_con
-        self.shared_context = shared_context
+        #self.shared_context = shared_context
         # System message template
         self.sys_msg = """
         You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
@@ -43,8 +43,8 @@ class TourismAgentManager:
             system_message=self.sys_msg,
             model_client=self.model_client,
             tools=[self.azure_ai_search_retriever],
-            reflect_on_tool_use=True,
-            model_context = self.shared_context
+            reflect_on_tool_use=True
+            #model_context = self.shared_context
         )
 
     def _init_user_proxy_agent(self):
@@ -57,8 +57,8 @@ class TourismAgentManager:
                 "If corrections are needed, suggest improvements briefly."
             ),
             model_client=self.model_client,
-            model_context = self.shared_context,
-            reflect_on_tool_use=True,
+            #model_context = self.shared_context,
+            reflect_on_tool_use=True
         )
 
     def _init_team(self):
