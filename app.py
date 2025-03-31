@@ -46,22 +46,45 @@ def health_check():
 def index():
     return render_template("myhome.html")
 
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
 
 @socketio.on("start_chat")
 def handle_start_chat(data):
-    
+    """Handle chat start from client"""
     query = data.get("query", "").strip()
-    
+
     if not query:
         logger.info("Empty query received")
         socketio.emit("error", {"message": "Query cannot be empty"})
         return
-    
+
     logger.info(f"Processing query: {query[:50]}...")
-    
+
     try:
+        # Run the async task in the background
+        socketio.start_background_task(process_my_query, query)
+
+    except Exception as e:
+        logger.error(f"Chat initialization error: {str(e)}", exc_info=True)
+        socketio.emit("error", {"message": f"Failed to start chat: {str(e)}"})
+
+
+def process_my_query(query):
+    """Run query processing in an event loop"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        loop.run_until_complete(_async_process_my_query(query))
+    except Exception as e:
+        logger.error(f"Error processing query: {str(e)}", exc_info=True)
+    finally:
+        loop.close()
+
+
+async def _async_process_my_query(query):
+    """Asynchronous query processing"""
+    try:
+        # Initialize Azure OpenAI client
         model_client = AzureOpenAIChatCompletionClient(
             azure_deployment=os.getenv('DEPLOYMENT_NAME'),
             azure_endpoint=os.getenv('AZURE_ENDPOINT'),
@@ -72,33 +95,32 @@ def handle_start_chat(data):
 
         # Initialize Azure Search client
         search_client = SearchClient(
-            service_endpoint, 
-            indexname, 
+            service_endpoint,
+            indexname,
             AzureKeyCredential(key)
         )
-        
+
         search_tool_obj = AzureAISearchTool(search_client=search_client)
-        
+
         # Initialize and use agent manager
         agent_manager = TourismAgentManager(
             model_client=model_client,
-            search_tool=search_tool_obj.azure_ai_search_retriever
+            search_tool=search_tool_obj.azure_ai_search_retriever,
             soc_con=socketio
         )
 
-        loop.run_until_complete(agent_manager.process_query(query))
+        # Run the async process with the emitter function
+        await agent_manager.process_query(query)
 
-        
     except Exception as e:
-        logger.error(f"Chat initialization error: {str(e)}", exc_info=True)
-        socketio.emit("error", {"message": f"Failed to start chat: {str(e)}"})
-
+        logger.error(f"Query processing error: {str(e)}", exc_info=True)
+        await socketio.emit("error", {"message": f"Failed to process query: {str(e)}"})
 
 
 if __name__ == "__main__":
     socketio.run(
-        app, 
-        host="0.0.0.0", 
+        app,
+        host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
         debug=False,
     )
