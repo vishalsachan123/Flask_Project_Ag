@@ -2,7 +2,7 @@ from gevent import monkey
 monkey.patch_all()
 
 import asyncio
-from flask import Flask, render_template, request
+from flask import Flask, render_template
 from flask_socketio import SocketIO
 from agent_ki_class import TourismAgentManager
 from tool_ki_class import AzureAISearchTool
@@ -11,8 +11,6 @@ import os
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
-#from autogen_core.model_context import BufferedChatCompletionContext
-
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -32,8 +30,6 @@ socketio = SocketIO(
     logger=True,
     engineio_logger=True
 )
-
-#shared_model_context=BufferedChatCompletionContext(buffer_size=6),
 
 # Azure Search Configuration
 service_endpoint = os.getenv('service_endpoint')
@@ -55,38 +51,37 @@ def index():
 def handle_start_chat(data):
     """Handle chat start from client"""
     query = data.get("query", "").strip()
-    client_id = request.sid
 
     if not query:
         logger.info("Empty query received")
-        socketio.emit("error", {"message": "Query cannot be empty"}, room = client_id)
+        socketio.emit("error", {"message": "Query cannot be empty"})
         return
 
     logger.info(f"Processing query: {query[:50]}...")
 
     try:
         # Run the async task in the background
-        socketio.start_background_task(process_my_query, query, client_id)
+        socketio.start_background_task(process_my_query, query)
 
     except Exception as e:
         logger.error(f"Chat initialization error: {str(e)}", exc_info=True)
-        socketio.emit("error", {"message": f"Failed to start chat: {str(e)}"}, room = client_id)
+        socketio.emit("error", {"message": f"Failed to start chat: {str(e)}"})
 
 
-def process_my_query(query, client_id):
+def process_my_query(query):
     """Run query processing in an event loop"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
-        loop.run_until_complete(_async_process_my_query(query,client_id))
+        loop.run_until_complete(_async_process_my_query(query))
     except Exception as e:
         logger.error(f"Error processing query: {str(e)}", exc_info=True)
     finally:
         loop.close()
 
 
-async def _async_process_my_query(query, client_id):
+async def _async_process_my_query(query):
     """Asynchronous query processing"""
     try:
         # Initialize Azure OpenAI client
@@ -111,9 +106,7 @@ async def _async_process_my_query(query, client_id):
         agent_manager = TourismAgentManager(
             model_client=model_client,
             search_tool=search_tool_obj.azure_ai_search_retriever,
-            soc_con=socketio,
-            room_id = client_id
-            #shared_context = shared_model_context
+            soc_con=socketio
         )
 
         # Run the async process with the emitter function
@@ -121,7 +114,7 @@ async def _async_process_my_query(query, client_id):
 
     except Exception as e:
         logger.error(f"Query processing error: {str(e)}", exc_info=True)
-        socketio.emit("error", {"message": f"Failed to process query: {str(e)}"}, room = client_id)
+        socketio.emit("error", {"message": f"Failed to process query: {str(e)}"})
 
 
 if __name__ == "__main__":

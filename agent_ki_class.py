@@ -11,12 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class TourismAgentManager:
-    def __init__(self, model_client, search_tool, soc_con, room_id):
-        self.model_client = model_client,
-        self.azure_ai_search_retriever = search_tool,
-        self.conn_socketio = soc_con,
-        self.room_id = room_id,
-        #self.shared_context = shared_context
+    def __init__(self, model_client, search_tool, soc_con):
+        self.model_client = model_client
+        self.azure_ai_search_retriever = search_tool
+        self.conn_socketio = soc_con
         # System message template
         self.sys_msg = """
         You are an AI assistant for Ras Al Khaimah Tourism, dedicated to providing personalized travel recommendations 
@@ -44,8 +42,7 @@ class TourismAgentManager:
             system_message=self.sys_msg,
             model_client=self.model_client,
             tools=[self.azure_ai_search_retriever],
-            reflect_on_tool_use=True
-            #model_context = self.shared_context
+            reflect_on_tool_use=True,
         )
 
     def _init_user_proxy_agent(self):
@@ -58,8 +55,7 @@ class TourismAgentManager:
                 "If corrections are needed, suggest improvements briefly."
             ),
             model_client=self.model_client,
-            #model_context = self.shared_context,
-            reflect_on_tool_use=True
+            reflect_on_tool_use=True,
         )
 
     def _init_team(self):
@@ -82,7 +78,7 @@ class TourismAgentManager:
                     c = "Task Completed.\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
+                    self.conn_socketio.emit("update", {"message": c})
                     continue
 
                 elif isinstance(message, TextMessage):
@@ -98,22 +94,22 @@ class TourismAgentManager:
 
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
+                    self.conn_socketio.emit("update", {"message": c})
 
                 elif message.type == "ToolCallRequestEvent":
                     c = f"Agent >> {message.source}: Action: ToolCallRequestEvent : ToolName : {message.content[0].name} : Arguments : {message.content[0].arguments}\n\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
+                    self.conn_socketio.emit("update", {"message": c})
 
                 elif message.type == "ToolCallExecutionEvent":
                     c = f"Agent >> {message.source}: Action: ToolCallExecutionEvent : ToolName : {message.content[0].name} : isError : {message.content[0].is_error}\n\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
+                    self.conn_socketio.emit("update", {"message": c})
 
                 else:
-                    self.conn_socketio.emit("update", {"message": "some other type"}, room = self.room_id)
+                    self.conn_socketio.emit("update", {"message": "some other type"})
 
             response = {
                 "ThoughtProcess": ThoughtProcess,
@@ -126,10 +122,10 @@ class TourismAgentManager:
 
         except Exception as e:
             logger.error(f"Main process error: {str(e)}", exc_info=True)
-            self.conn_socketio.emit("update", {"message": f"Processing error: {str(e)}"}, room = self.room_id)
+            self.conn_socketio.emit("update", {"message": f"Processing error: {str(e)}"})
 
             # Send fallback messages for error
             bucket = ["call", "nhi", "lag", "rhi", "call", "nhi", "lag", "rhi"]
             for i in bucket:
                 time.sleep(0.5)
-                self.conn_socketio.emit("update", {"message": i}, room = self.room_id)
+                self.conn_socketio.emit("update", {"message": i})
