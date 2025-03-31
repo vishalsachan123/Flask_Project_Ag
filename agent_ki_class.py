@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class TourismAgentManager:
-    def __init__(self, model_client, search_tool, soc_con):
+    def __init__(self, model_client, search_tool, soc_con,room_id):
         self.model_client = model_client
         self.azure_ai_search_retriever = search_tool
-        self.conn_socketio = soc_con
+        self.conn_socketio = soc_con,
+        self.room_id = room_id
         #self.shared_context = shared_context
         # System message template
         self.sys_msg = """
@@ -81,7 +82,7 @@ class TourismAgentManager:
                     c = "Task Completed.\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
                     continue
 
                 elif isinstance(message, TextMessage):
@@ -97,22 +98,22 @@ class TourismAgentManager:
 
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
 
                 elif message.type == "ToolCallRequestEvent":
                     c = f"Agent >> {message.source}: Action: ToolCallRequestEvent : ToolName : {message.content[0].name} : Arguments : {message.content[0].arguments}\n\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
 
                 elif message.type == "ToolCallExecutionEvent":
                     c = f"Agent >> {message.source}: Action: ToolCallExecutionEvent : ToolName : {message.content[0].name} : isError : {message.content[0].is_error}\n\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c}, room = self.room_id)
 
                 else:
-                    self.conn_socketio.emit("update", {"message": "some other type"})
+                    self.conn_socketio.emit("update", {"message": "some other type"}, room = self.room_id)
 
             response = {
                 "ThoughtProcess": ThoughtProcess,
@@ -125,10 +126,10 @@ class TourismAgentManager:
 
         except Exception as e:
             logger.error(f"Main process error: {str(e)}", exc_info=True)
-            self.conn_socketio.emit("update", {"message": f"Processing error: {str(e)}"})
+            self.conn_socketio.emit("update", {"message": f"Processing error: {str(e)}"}, room = self.room_id)
 
             # Send fallback messages for error
             bucket = ["call", "nhi", "lag", "rhi", "call", "nhi", "lag", "rhi"]
             for i in bucket:
                 time.sleep(0.5)
-                self.conn_socketio.emit("update", {"message": i})
+                self.conn_socketio.emit("update", {"message": i}, room = self.room_id)
