@@ -46,6 +46,9 @@ def health_check():
 def index():
     return render_template("myhome.html")
 
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 @socketio.on("start_chat")
 def handle_start_chat(data):
     
@@ -81,54 +84,15 @@ def handle_start_chat(data):
             model_client=model_client,
             search_tool=search_tool_obj.azure_ai_search_retriever
         )
+
+        loop.run_until_complete(agent_manager.process_query(query, socketio))
+
         
     except Exception as e:
         logger.error(f"Chat initialization error: {str(e)}", exc_info=True)
         socketio.emit("error", {"message": f"Failed to start chat: {str(e)}"})
 
-def async_process_query(query, conn_socketio):
-    """Process user query asynchronously"""
-    try:
-        # Initialize Azure OpenAI client
-        model_client = AzureOpenAIChatCompletionClient(
-            azure_deployment=os.getenv('DEPLOYMENT_NAME'),
-            azure_endpoint=os.getenv('AZURE_ENDPOINT'),
-            model="gpt-4o-2024-05-13",
-            api_version=os.getenv('OPENAI_API_VERSION'),
-            api_key=os.getenv('API_KEY'),
-        )
 
-        # Initialize Azure Search client
-        search_client = SearchClient(
-            service_endpoint, 
-            indexname, 
-            AzureKeyCredential(key)
-        )
-        
-        search_tool_obj = AzureAISearchTool(search_client=search_client)
-        
-        # Initialize and use agent manager
-        agent_manager = TourismAgentManager(
-            model_client=model_client,
-            search_tool=search_tool_obj.azure_ai_search_retriever
-        )
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Run the async process with the emitter function
-        loop.run_until_complete(agent_manager.process_query(query, conn_socketio))
-        
-        
-    except Exception as e:
-        logger.error(f"Query processing error: {str(e)}", exc_info=True)
-        conn_socketio.emit("error", {
-            "message": f"Failed to process query: {str(e)}"
-        })
-
-    finally:
-        loop.close()
-        del search_client,model_client,agent_manager
 
 if __name__ == "__main__":
     socketio.run(
