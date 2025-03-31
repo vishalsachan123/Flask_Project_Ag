@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class TourismAgentManager:
-    def __init__(self, model_client, search_tool, soc_con, shared_context):
+    def __init__(self, model_client, search_tool, soc_con):
         self.model_client = model_client
         self.azure_ai_search_retriever = search_tool
         self.conn_socketio = soc_con
