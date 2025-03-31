@@ -78,7 +78,7 @@ class TourismAgentManager:
                     c = "Task Completed.\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c})
                     continue
 
                 elif isinstance(message, TextMessage):
@@ -94,22 +94,22 @@ class TourismAgentManager:
 
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c})
 
                 elif message.type == "ToolCallRequestEvent":
                     c = f"Agent >> {message.source}: Action: ToolCallRequestEvent : ToolName : {message.content[0].name} : Arguments : {message.content[0].arguments}\n\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c})
 
                 elif message.type == "ToolCallExecutionEvent":
                     c = f"Agent >> {message.source}: Action: ToolCallExecutionEvent : ToolName : {message.content[0].name} : isError : {message.content[0].is_error}\n\n"
                     ThoughtProcess += c
                     logger.info(f">> {c}")
-                    await self.conn_socketio.emit("update", {"message": c})
+                    self.conn_socketio.emit("update", {"message": c})
 
                 else:
-                    await self.conn_socketio.emit("update", {"message": "some other type"})
+                    self.conn_socketio.emit("update", {"message": "some other type"})
 
             response = {
                 "ThoughtProcess": ThoughtProcess,
@@ -122,10 +122,10 @@ class TourismAgentManager:
 
         except Exception as e:
             logger.error(f"Main process error: {str(e)}", exc_info=True)
-            await self.conn_socketio.emit("update", {"message": f"Processing error: {str(e)}"})
+            self.conn_socketio.emit("update", {"message": f"Processing error: {str(e)}"})
 
             # Send fallback messages for error
             bucket = ["call", "nhi", "lag", "rhi", "call", "nhi", "lag", "rhi"]
             for i in bucket:
                 time.sleep(0.5)
-                await self.conn_socketio.emit("update", {"message": i})
+                self.conn_socketio.emit("update", {"message": i})

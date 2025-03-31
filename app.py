@@ -114,7 +114,7 @@ async def _async_process_my_query(query):
 
     except Exception as e:
         logger.error(f"Query processing error: {str(e)}", exc_info=True)
-        await socketio.emit("error", {"message": f"Failed to process query: {str(e)}"})
+        socketio.emit("error", {"message": f"Failed to process query: {str(e)}"})
 
 
 if __name__ == "__main__":
